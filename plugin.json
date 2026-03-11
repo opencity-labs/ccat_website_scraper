@@ -1,12 +1,12 @@
 {
-    "name": "My plugin",
-    "version": "0.0.2",
-    "description": "Description of my_plugin.",
-    "author_name": "Me",
-    "author_url": "https://mywebsite.me",
-    "plugin_url": "https://github.com/my_name/my_plugin",
-    "tags": "cat, template, example",
-    "thumb": "https://raw.githubusercontent.com/my_repo_path/my_plugin.png",
-    "min_cat_version": "2.0.0",
+    "name": "Website Scraper",
+    "version": "0.0.1",
+    "description": "Unified website scraper that crawls, deduplicates, and ingests web content into the Cheshire Cat declarative memory. Supports robots.txt directives, sitemap parsing, granular scheduling, content hashing, retry logic, and stale content cleanup.",
+    "author_name": "OpenCity Labs",
+    "author_url": "https://opencitylabs.it/",
+    "plugin_url": "https://github.com/opencity-labs/ccat_websites_scraper",
+    "tags": "scraping, crawling, memory, RAG, sitemap, robots.txt, deduplication",
+    "thumb": "https://raw.githubusercontent.com/opencity-labs/ccat_website_scraper/main/website_scraper.png",
+    "min_cat_version": "1.9.2",
     "max_cat_version": "Unknown"
 }

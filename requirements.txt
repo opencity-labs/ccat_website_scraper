@@ -1,0 +1,6 @@
+scrapling[camoufox]
+httpx
+curl-cffi
+browserforge
+msgspec
+camoufox
