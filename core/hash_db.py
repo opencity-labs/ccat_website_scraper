@@ -3,11 +3,11 @@
 Replaces the SQLAlchemy-based Dietician DB with a simpler, faster approach
 using Python's built-in ``sqlite3`` module.  The schema stores:
 
-* **url** — the canonical source URL
-* **content_hash** — SHA-256 hex digest of the full page content (pre-chunking)
-* **chunk_count** — number of chunks produced at last ingestion
-* **last_seen** — epoch timestamp of last successful scrape
-* **session_id** — session that last touched this URL
+* **url** -  the canonical source URL
+* **content_hash** -  SHA-256 hex digest of the full page content (pre-chunking)
+* **chunk_count** -  number of chunks produced at last ingestion
+* **last_seen** -  epoch timestamp of last successful scrape
+* **session_id** -  session that last touched this URL
 
 This database enables:
 1. Skip ingestion when content hash is unchanged.
@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS documents (
     content_hash TEXT NOT NULL,
     chunk_count  INTEGER NOT NULL DEFAULT 0,
     last_seen    REAL NOT NULL,
-    session_id   TEXT NOT NULL
+    session_id   TEXT NOT NULL,
+    miss_count   INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -60,6 +61,13 @@ class HashDB:
         self._conn.execute("PRAGMA journal_mode=WAL")  # faster concurrent reads
         self._conn.execute(_CREATE_SQL)
         self._conn.execute(_IDX_SQL)
+        # Migrate older databases that lack the miss_count column.
+        try:
+            self._conn.execute(
+                "ALTER TABLE documents ADD COLUMN miss_count INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
         self._conn.commit()
 
     # ── Queries ──────────────────────────────────────────────────
@@ -67,7 +75,7 @@ class HashDB:
     def get(self, url: str) -> Optional[Dict]:
         """Return row as dict or ``None``."""
         row = self._conn.execute(
-            "SELECT url, content_hash, chunk_count, last_seen, session_id FROM documents WHERE url = ?",
+            "SELECT url, content_hash, chunk_count, last_seen, session_id, miss_count FROM documents WHERE url = ?",
             (url,),
         ).fetchone()
         if row is None:
@@ -78,6 +86,7 @@ class HashDB:
             "chunk_count": row[2],
             "last_seen": row[3],
             "session_id": row[4],
+            "miss_count": row[5],
         }
 
     def upsert(
@@ -85,13 +94,14 @@ class HashDB:
     ) -> None:
         """Insert or update a document record."""
         self._conn.execute(
-            """INSERT INTO documents (url, content_hash, chunk_count, last_seen, session_id)
-               VALUES (?, ?, ?, ?, ?)
+            """INSERT INTO documents (url, content_hash, chunk_count, last_seen, session_id, miss_count)
+               VALUES (?, ?, ?, ?, ?, 0)
                ON CONFLICT(url) DO UPDATE SET
                    content_hash = excluded.content_hash,
                    chunk_count  = excluded.chunk_count,
                    last_seen    = excluded.last_seen,
-                   session_id   = excluded.session_id""",
+                   session_id   = excluded.session_id,
+                   miss_count   = 0""",
             (url, hash_val, chunk_count, time.time(), session_id),
         )
         self._conn.commit()
@@ -99,7 +109,7 @@ class HashDB:
     def touch(self, url: str, session_id: str) -> None:
         """Update ``last_seen`` and ``session_id`` without changing hash."""
         self._conn.execute(
-            "UPDATE documents SET last_seen = ?, session_id = ? WHERE url = ?",
+            "UPDATE documents SET last_seen = ?, session_id = ?, miss_count = 0 WHERE url = ?",
             (time.time(), session_id, url),
         )
         self._conn.commit()
@@ -108,11 +118,23 @@ class HashDB:
         self._conn.execute("DELETE FROM documents WHERE url = ?", (url,))
         self._conn.commit()
 
+    def increment_miss_count(self, url: str) -> int:
+        """Increment ``miss_count`` for *url* and return the new value."""
+        self._conn.execute(
+            "UPDATE documents SET miss_count = miss_count + 1 WHERE url = ?",
+            (url,),
+        )
+        self._conn.commit()
+        row = self._conn.execute(
+            "SELECT miss_count FROM documents WHERE url = ?", (url,)
+        ).fetchone()
+        return row[0] if row else 0
+
     def urls_for_command_not_in(
         self, session_id: str, keep_urls: Set[str]
     ) -> List[str]:
         """Return URLs that were last seen BEFORE this session for the given
-        command pattern — i.e. stale URLs to clean up.
+        command pattern -  i.e. stale URLs to clean up.
 
         We identify "same logical scrape" by looking at rows whose
         ``session_id`` differs from the current one.  The caller passes

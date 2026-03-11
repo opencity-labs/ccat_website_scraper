@@ -1,10 +1,10 @@
-"""Memory manager — deduplication, ingestion, stale-content cleanup.
+"""Memory manager -  deduplication, ingestion, stale-content cleanup.
 
 This module replaces the three-plugin orchestration (Dietician + middleman +
 ScrapyCat ingestion loop) with a single, self-contained flow:
 
-1. **Before ingestion** — compare content hash to decide: skip / partial-update / full ingest.
-2. **After ingestion** — retry transient failures, remove stale memories.
+1. **Before ingestion** -  compare content hash to decide: skip / partial-update / full ingest.
+2. **After ingestion** -  retry transient failures, remove stale memories.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def check_url_freshness(url: str, db: HashDB, user_agent: str) -> Tuple[str, boo
 
     For URLs **already in the hash DB** (previously ingested):
     * ``Last-Modified`` newer than ``last_seen`` → ``True`` (should update)
-    * ``Last-Modified`` absent or older → ``False`` (skip — the hash check
+    * ``Last-Modified`` absent or older → ``False`` (skip -  the hash check
       during ingestion will catch real content changes anyway)
 
     For URLs **not in the hash DB** (first time):
@@ -40,7 +40,7 @@ def check_url_freshness(url: str, db: HashDB, user_agent: str) -> Tuple[str, boo
     try:
         existing = db.get(url)
         if existing is None:
-            return url, True  # new URL — always process
+            return url, True  # new URL -  always process
 
         last_seen = existing["last_seen"]
 
@@ -53,10 +53,10 @@ def check_url_freshness(url: str, db: HashDB, user_agent: str) -> Tuple[str, boo
                 )
                 resp.close()
             if resp.status_code >= 400:
-                # Server error — URL is known, skip rather than re-ingest
+                # Server error -  URL is known, skip rather than re-ingest
                 return url, False
         except Exception:
-            # Network error — URL is known, skip
+            # Network error -  URL is known, skip
             return url, False
 
         lm = resp.headers.get("Last-Modified")
@@ -72,9 +72,8 @@ def check_url_freshness(url: str, db: HashDB, user_agent: str) -> Tuple[str, boo
                 pass
             return url, False  # Last-Modified is older or equal → skip
 
-        # No Last-Modified header, but URL is already in hash DB.
-        # Skip it — the hash check during ingestion catches real changes.
-        return url, False
+        # No Last-Modified header -  fall through to fetch + hash check.
+        return url, True
     except Exception:
         return url, True
 
@@ -124,9 +123,9 @@ def should_ingest(
     """Decide how to handle *url* given its current *page_content*.
 
     Returns one of:
-    * ``"full"`` — ingest all chunks (new or changed content)
-    * ``"skip"`` — hash + chunk count identical, nothing to do
-    * ``"partial"`` — hash changed, caller should diff old vs new chunks
+    * ``"full"`` -  ingest all chunks (new or changed content)
+    * ``"skip"`` -  hash + chunk count identical, nothing to do
+    * ``"partial"`` -  hash changed, caller should diff old vs new chunks
 
     Side-effect: the DB row is created/updated on ``"full"``; touched on ``"skip"``.
     """
@@ -225,6 +224,8 @@ def retry_failed(
                     "source": url,
                     "session_id": ctx.session_id,
                 }
+                if db.get(url) is not None:
+                    delete_memories_by_source(url, cat)
                 cat.rabbit_hole.ingest_file(
                     cat=cat,
                     file=url,
@@ -232,6 +233,7 @@ def retry_failed(
                     chunk_overlap=ctx.chunk_overlap,
                     metadata=meta,
                 )
+                db.upsert(url, "retried-via-rabbithole", 0, ctx.session_id)
                 remaining.remove(url)
                 recovered.append(url)
                 jlog("info", "retry_ok", url=url, attempt=attempt)
@@ -257,13 +259,21 @@ def cleanup_stale_memories(
     db: HashDB,
     session_id: str,
     keep_urls: Set[str],
+    remove_delay: int = 0,
     qdrant_limit: int = 10_000,
 ) -> List[str]:
     """Remove vector memories (and DB rows) for URLs that were present in a
     previous session but are no longer found.
 
     *keep_urls* should be the union of scraped + ignored + still-failed URLs.
-    Returns the list of removed URLs.
+
+    When *remove_delay* > 0, a stale URL is not deleted immediately.
+    Instead its ``miss_count`` is incremented each session it is absent.
+    Only when ``miss_count >= remove_delay`` the URL is actually purged
+    from both the vector store and the hash DB.  If the URL reappears in
+    a later session (upsert / touch), ``miss_count`` resets to 0.
+
+    Returns the list of URLs actually removed.
     """
     stale = db.urls_for_command_not_in(session_id, keep_urls)
     if not stale:
@@ -274,6 +284,18 @@ def cleanup_stale_memories(
 
     for url in stale:
         try:
+            if remove_delay > 0:
+                new_count = db.increment_miss_count(url)
+                if new_count < remove_delay:
+                    jlog(
+                        "info",
+                        "stale_url_deferred",
+                        url=url,
+                        miss_count=new_count,
+                        remove_delay=remove_delay,
+                    )
+                    continue
+
             filt = collection._qdrant_filter_from_dict({"source": url})
             points, _ = collection.client.scroll(
                 collection_name=collection.collection_name,

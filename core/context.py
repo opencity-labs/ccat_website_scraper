@@ -1,4 +1,4 @@
-"""Scraping session context — shared mutable state for one scraping run."""
+"""Scraping session context -  shared mutable state for one scraping run."""
 
 from __future__ import annotations
 

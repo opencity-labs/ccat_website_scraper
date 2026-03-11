@@ -1,6 +1,6 @@
 {
     "name": "Website Scraper",
-    "version": "0.0.1",
+    "version": "0.0.11",
     "description": "Unified website scraper that crawls, deduplicates, and ingests web content into the Cheshire Cat declarative memory. Supports robots.txt directives, sitemap parsing, granular scheduling, content hashing, retry logic, and stale content cleanup.",
     "author_name": "OpenCity Labs",
     "author_url": "https://opencitylabs.it/",

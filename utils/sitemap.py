@@ -2,7 +2,7 @@
 
 Handles:
 * Standard ``<urlset>`` sitemaps
-* Sitemap index files (``<sitemapindex>``) — recursively fetches sub-sitemaps
+* Sitemap index files (``<sitemapindex>``) -  recursively fetches sub-sitemaps
 * ``<changefreq>`` and ``<lastmod>`` per-URL metadata (exposed to the caller
   so the scheduler/optimiser can decide whether to re-scrape)
 * Sitemap URLs declared in robots.txt (``Sitemap:`` directive)
@@ -181,7 +181,7 @@ def _parse_sitemap_xml(
                 entries.extend(_parse_sitemap_xml(sub_text, user_agent, visited))
         return entries
 
-    # Unknown root — try urlset parse anyway
+    # Unknown root -  try urlset parse anyway
     return _parse_urlset(root)
 
 

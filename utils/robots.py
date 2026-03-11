@@ -1,12 +1,12 @@
 """Enhanced robots.txt parser.
 
 Beyond standard Allow / Disallow, this module also extracts:
-* ``Crawl-delay`` — respected as a per-domain request delay.
+* ``Crawl-delay`` -  respected as a per-domain request delay.
 * Per-path refresh hints found in non-standard ``# refresh: <seconds>``
   comment lines (used by some site owners to indicate how often a section
   should be re-scraped).  These are stored in ``RobotsInfo.refresh_rules``
   as ``{path_prefix: interval_seconds}``.
-* ``Sitemap`` directives — returned so the sitemap module can use them.
+* ``Sitemap`` directives -  returned so the sitemap module can use them.
 """
 
 from __future__ import annotations

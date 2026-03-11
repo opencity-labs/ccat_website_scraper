@@ -1,18 +1,18 @@
 """Multi-threaded BFS web crawler with batch-fetch support.
 
 Supports two backends:
-* **standard** — ``requests`` + BeautifulSoup (default, lightweight)
-* **scrapling** — Camoufox stealth browser (JS rendering, anti-detection)
+* **standard** -  ``requests`` + BeautifulSoup (default, lightweight)
+* **scrapling** -  Camoufox stealth browser (JS rendering, anti-detection)
 
 For the *Scrapling* backend the module reuses a **single Camoufox browser
 session** across an entire batch of URLs, avoiding the per-page browser
 launch/teardown that would otherwise crash the container on large sitemaps.
 
 Anti-detection features:
-* **Proxy rotation** — round-robin switching through a configurable proxy list
-* **Adaptive backoff** — exponential pause on 429 / empty-content responses
+* **Proxy rotation** -  round-robin switching through a configurable proxy list
+* **Adaptive backoff** -  exponential pause on 429 / empty-content responses
 * **Browser restart** on consecutive failures (Camoufox)
-* **Randomised delays** — jitter between requests
+* **Randomised delays** -  jitter between requests
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ class _BackoffTracker:
 
     @property
     def should_restart_browser(self) -> bool:
-        """True when consecutive failures hit the threshold — signals the
+        """True when consecutive failures hit the threshold -  signals the
         caller to restart the browser session and/or rotate proxy."""
         return self.enabled and self.consecutive_fails >= self.threshold
 
@@ -230,7 +230,7 @@ def batch_fetch(ctx: ScrapeContext, cat: Any, urls: List[str]) -> int:
         jlog(
             "error",
             "scrapling_not_available",
-            msg="scrapling engine selected but import failed — falling back to standard. "
+            msg="scrapling engine selected but import failed -  falling back to standard. "
             "Make sure 'scrapling[camoufox]' is installed.",
         )
     return _batch_fetch_standard(ctx, cat, urls)
@@ -284,7 +284,7 @@ def _batch_fetch_scrapling(ctx: ScrapeContext, cat: Any, urls: List[str]) -> int
         jlog(
             "warning",
             "camoufox_sync_unavailable",
-            msg="Falling back to StealthyFetcher per page — this is slower and uses more memory",
+            msg="Falling back to StealthyFetcher per page -  this is slower and uses more memory",
         )
         for i, url in enumerate(urls, 1):
             if not _is_robots_allowed(ctx, url):
@@ -347,7 +347,7 @@ def _batch_fetch_camoufox(
     proxy_rot: _ProxyRotator,
     backoff: _BackoffTracker,
 ) -> int:
-    """Core Camoufox implementation — reuses ONE browser across all *urls*.
+    """Core Camoufox implementation -  reuses ONE browser across all *urls*.
 
     Restarts the browser session when:
     - Consecutive failures reach the backoff threshold
@@ -377,7 +377,7 @@ def _batch_fetch_camoufox(
                 remaining=total - url_idx,
             )
 
-        # Remember position before browser starts — if browser creation
+        # Remember position before browser starts -  if browser creation
         # itself fails, we must still advance past the current URL to
         # prevent an infinite loop.
         idx_before = url_idx
@@ -458,7 +458,7 @@ def _batch_fetch_camoufox(
                                 "browser_page_recreate_failed",
                                 error=str(page_exc),
                             )
-                            break  # browser dead — restart
+                            break  # browser dead -  restart
 
                         if backoff.should_restart_browser:
                             jlog(
@@ -495,7 +495,7 @@ def _batch_fetch_camoufox(
                     ctx.failed_pages.append(current)
                 url_idx += 1
             else:
-                # Inner loop ran at least once — mark the last URL.
+                # Inner loop ran at least once -  mark the last URL.
                 current = urls[url_idx - 1] if url_idx > 0 else None
                 if (
                     current
@@ -642,7 +642,7 @@ def _extract_valid_urls(
         if not (is_root or is_allowed):
             continue
 
-        # Path scope (root domains only — per-domain)
+        # Path scope (root domains only -  per-domain)
         if is_root and ctx.allowed_paths:
             domain_paths = ctx.allowed_paths.get(domain, set())
             if domain_paths and not any(
@@ -725,7 +725,9 @@ def _crawl_page(
                 if now - ctx.last_update_time > 0.5:
                     ctx.last_update_time = now
                     try:
-                        cat.send_ws_message(f"Scraped {count} pages — currently: {url}")
+                        cat.send_ws_message(
+                            f"Scraped {count} pages -  currently: {url}"
+                        )
                     except Exception:
                         pass
 
@@ -817,7 +819,7 @@ def crawl(ctx: ScrapeContext, cat: Any, start_urls: List[str]) -> None:
                     break
                 continue
 
-            _consecutive_stalls = 0  # Made progress — reset stall counter.
+            _consecutive_stalls = 0  # Made progress -  reset stall counter.
 
             for f in done:
                 if f not in futures:

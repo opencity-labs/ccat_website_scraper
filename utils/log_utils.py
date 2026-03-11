@@ -24,7 +24,7 @@ def jlog(level: str, event: str, **data: Any) -> None:
     Parameters
     ----------
     level : str
-        Log level — one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``,
+        Log level -  one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``,
         ``"critical"``.
     event : str
         Machine-readable event name (e.g. ``"page_fetched"``, ``"ingest_skip"``).

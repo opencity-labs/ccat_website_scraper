@@ -1,4 +1,4 @@
-"""ccat_websites_scraper — main plugin module.
+"""ccat_websites_scraper -  main plugin module.
 
 Hooks into the Cheshire Cat lifecycle to provide:
 * Scheduled scraping via WhiteRabbit
@@ -124,7 +124,7 @@ if _original_ingest_file and _RabbitHoleClass:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Custom HTML parser — strips display:none elements
+# Custom HTML parser -  strips display:none elements
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -391,7 +391,7 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
     ingested = 0
     skipped = 0
     total_to_process = len(ctx.scraped_pages)
-    all_pages = list(ctx.scraped_pages)  # snapshot — we mutate ctx below
+    all_pages = list(ctx.scraped_pages)  # snapshot -  we mutate ctx below
     batch_sz = ctx.batch_size
 
     jlog(
@@ -431,7 +431,7 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
                     error=str(fetch_exc),
                 )
                 # Mark every URL that wasn't fetched as failed so they
-                # can be retried later — do NOT abort the whole run.
+                # can be retried later -  do NOT abort the whole run.
                 for u in urls_needing_content:
                     if u not in ctx.scraped_contents and u not in ctx.failed_pages:
                         ctx.failed_pages.append(u)
@@ -461,6 +461,8 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
                     )
                 elif not ctx.use_scrapling:
                     # Standard engine fallback: let rabbit_hole fetch the page
+                    if db.get(url) is not None:
+                        delete_memories_by_source(url, cat)
                     if ctx.request_delay > 0:
                         time.sleep(random_sleep(ctx.request_delay))
                     try:
@@ -486,7 +488,7 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
                         jlog("error", "ingest_failed_rabbithole", url=url, error=str(e))
                         continue
                 else:
-                    # Scrapling engine but URL failed content fetch — mark
+                    # Scrapling engine but URL failed content fetch -  mark
                     # as *failed* so the retry logic picks it up.
                     jlog(
                         "warning",
@@ -498,7 +500,7 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
                         ctx.failed_pages.append(url)
                     continue
 
-                # We have docs — run hash-based dedup
+                # We have docs -  run hash-based dedup
                 full_text = "\n".join(d.page_content for d in docs)
                 decision = should_ingest(db, url, full_text, len(docs), ctx.session_id)
 
@@ -518,7 +520,7 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
                     n_new = diff_and_store(cat, docs, url, metadata)
                     if n_new == 0:
                         # Hash changed (e.g. dynamic HTML) but actual
-                        # chunk content is identical — treat as skip.
+                        # chunk content is identical -  treat as skip.
                         jlog(
                             "info",
                             "ingest_skip_no_diff",
@@ -595,7 +597,10 @@ def run_scrape(cat: Any, scheduled: bool = False) -> str:
     keep: Set[str] = (
         set(ctx.scraped_pages) | set(ctx.ignored_pages) | set(ctx.failed_pages)
     )
-    removed = cleanup_stale_memories(cat, db, ctx.session_id, keep)
+    removed = cleanup_stale_memories(
+        cat, db, ctx.session_id, keep,
+        remove_delay=settings.get("remove_delay", 0),
+    )
     if removed:
         jlog("info", "stale_cleanup", removed=len(removed))
 

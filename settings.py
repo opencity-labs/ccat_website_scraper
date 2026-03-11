@@ -22,7 +22,7 @@ class ScrapingEngine(str, Enum):
 
 
 class PluginSettings(BaseModel):
-    """Websites Scraper — unified settings."""
+    """Websites Scraper -  unified settings."""
 
     # ── Targets ──────────────────────────────────────────────────────
     starting_urls: str = Field(
@@ -111,7 +111,7 @@ class PluginSettings(BaseModel):
     only_sitemap: bool = Field(
         default=False,
         title="Only scrape URLs from sitemap",
-        description="When enabled, ONLY URLs found in sitemap.xml are scraped — the crawler will not follow links on pages.",
+        description="When enabled, ONLY URLs found in sitemap.xml are scraped -  the crawler will not follow links on pages.",
     )
 
     # ── Text chunking ────────────────────────────────────────────────
@@ -143,6 +143,16 @@ class PluginSettings(BaseModel):
         default="cat/data/websites_scraper.db",
         title="SQLite database path",
         description="Path for the content-hash tracking database. Change only if you know what you are doing.",
+    )
+    remove_delay: int = Field(
+        default=0,
+        title="Stale removal delay (sessions)",
+        description=(
+            "Number of consecutive scraping sessions a page must be missing "
+            "before it is removed from memory. 0 = remove immediately. "
+            "Useful to avoid deleting pages that are temporarily unavailable "
+            "(e.g. 404/429 for a few hours)."
+        ),
     )
     delete_db: bool = Field(
         default=False,
@@ -280,6 +290,12 @@ class PluginSettings(BaseModel):
     def _schedule_minute(cls, v):
         if not 0 <= v <= 59:
             raise ValueError("Must be 0-59.")
+        return v
+
+    @validator("remove_delay")
+    def _remove_delay(cls, v):
+        if v < 0:
+            raise ValueError("Must be >= 0.")
         return v
 
     @validator("max_retry_attempts")
