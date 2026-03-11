@@ -53,10 +53,12 @@ def _parse_extra_directives(
     sitemaps: List[str] = []
     refresh_rules: Dict[str, int] = {}
 
-    # Track which user-agent block we're in
+    # Track which user-agent block we're in.  Consecutive User-agent
+    # lines belong to the same block; any other directive ends the group.
     in_matching_block = False
     in_wildcard_block = False
     wildcard_crawl_delay: Optional[float] = None
+    prev_was_ua = False
 
     for line in text.splitlines():
         stripped = line.strip()
@@ -66,17 +68,36 @@ def _parse_extra_directives(
             url = stripped.split(":", 1)[1].strip()
             if url:
                 sitemaps.append(url)
+            prev_was_ua = False
             continue
 
-        # ── User-agent line → determines which block we're in ────
+        # ── User-agent line ──────────────────────────────────────
         if stripped.lower().startswith("user-agent:"):
             ua_value = stripped.split(":", 1)[1].strip().lower()
-            in_matching_block = user_agent.lower() in ua_value or ua_value == "*"
-            if ua_value == "*":
-                in_wildcard_block = True
-            else:
+            if not prev_was_ua:
+                # New block — reset flags
+                in_matching_block = False
                 in_wildcard_block = False
+            # Accumulate matches within the same block
+            if ua_value == "*":
+                in_matching_block = True
+                in_wildcard_block = True
+            elif ua_value in user_agent.lower():
+                in_matching_block = True
+            prev_was_ua = True
             continue
+
+        # Empty lines and comments don't break UA block grouping
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            m = re.match(r"#\s*refresh:\s*(\S+)\s+(\d+)", stripped)
+            if m:
+                refresh_rules[m.group(1)] = int(m.group(2))
+            continue
+
+        # Any real directive ends the UA grouping
+        prev_was_ua = False
 
         # ── Crawl-delay ──────────────────────────────────────────
         if stripped.lower().startswith("crawl-delay:"):
@@ -88,14 +109,6 @@ def _parse_extra_directives(
                     wildcard_crawl_delay = delay_val
             except ValueError:
                 pass
-            continue
-
-        # ── Non-standard refresh hint ────────────────────────────
-        # Format:  # refresh: /path <seconds>
-        # Example: # refresh: /news 3600
-        m = re.match(r"#\s*refresh:\s*(\S+)\s+(\d+)", stripped)
-        if m:
-            refresh_rules[m.group(1)] = int(m.group(2))
             continue
 
     if crawl_delay is None:
