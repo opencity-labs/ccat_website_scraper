@@ -1,7 +1,8 @@
 """Settings model for the Websites Scraper plugin."""
 
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
+from pydantic.v1 import validator
 from cat.mad_hatter.decorators import plugin
 
 
